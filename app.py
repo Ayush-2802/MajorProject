@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +8,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
-
+# st.markdown(f"""
+# <style>
+# {open('style.css', 'r').read()}
+# </style>
+# """, unsafe_allow_html=True)
 # Load data
 data = pd.read_csv('machinery_data.csv')
 data.fillna(method='ffill', inplace=True)
@@ -42,52 +47,29 @@ def predict_maintenance(features):
         'Anomaly Detection': 'Anomaly' if cluster_pred[0] == 1 else 'Normal'
     }
 
-# Add custom CSS for rectangular tab highlighting and animation
-st.markdown("""
-    <style>
-    /* Decrease padding/margins in the main container */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        max-width: 95%;
-    }
-    
-    div[data-testid="stHorizontalBlock"] > div:first-child {
-        display: flex;
-        justify-content: space-between;
-    }
-    div[data-testid="stHorizontalBlock"] > div:first-child > div {
-        border: 2px solid transparent;
-        padding: 10px 20px;
-        border-radius: 5px;
-        transition: all 0.3s ease-in-out;
-    }
-    div[data-testid="stHorizontalBlock"] > div:first-child > div[aria-selected="true"] {
-        border-color: #1DB954; /* Highlight color */
-        background-color: #1e1e1e;
-        transform: scale(1.05);
-    }
-    div[data-testid="stHorizontalBlock"] > div:first-child > div:hover {
-        border-color: #1DB954;
-        background-color: #2a2a2a;
-        transform: scale(1.03);
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Streamlit Option Menu
+with st.sidebar:
+    selected = option_menu(
+        menu_title="Main Menu",
+        options=["Home", "Historical Data", "Input Data", "Results", "Visualizations"],
+        icons=["house", "table", "input-cursor", "check2-circle", "bar-chart-line"],
+        menu_icon="cast",
+        default_index=0,
+    )
 
-# Streamlit Top Navigation Tabs
-tabs = st.tabs(["Home", "Input Data", "Results", "Visualizations","Data"])
-
-with tabs[0]:
+if selected == "Home":
     st.title("Welcome to the Predictive Maintenance Dashboard")
     st.markdown("""
     This application provides predictive maintenance insights for industrial machinery. 
-    Use the navigation tabs to explore different sections of the app.
+    Use the navigation menu to explore different sections of the app.
     """)
 
-with tabs[1]:
-    st.title("Input Features")
+elif selected == "Historical Data":
+    st.title("📂 Historical Data")
+    st.write(data.head(10))
+
+elif selected == "Input Data":
+    st.title("🔧 Input Features")
     st.markdown("Use the sliders to input the sensor readings and operational hours or generate random values.")
 
     if 'generated_values' not in st.session_state:
@@ -122,8 +104,8 @@ with tabs[1]:
         st.session_state['input_features'] = [sensor_1, sensor_2, sensor_3, operational_hours]
         st.success("Input data submitted successfully! Navigate to the Results page to see the predictions.")
 
-with tabs[2]:
-    st.title("Prediction Results")
+elif selected == "Results":
+    st.title("📊 Prediction Results")
     if 'input_features' not in st.session_state:
         st.warning("Please input data first in the 'Input Data' section.")
     else:
@@ -137,8 +119,8 @@ with tabs[2]:
         if prediction['Anomaly Detection'] == 'Anomaly':
             st.warning('⚠️ Anomaly detected in sensor readings!')
 
-with tabs[3]:
-    st.title("Data Visualizations")
+elif selected == "Visualizations":
+    st.title("📊 Data Visualizations")
 
     # Histogram for sensor readings
     st.subheader("Histogram of Sensor Readings")
@@ -230,77 +212,3 @@ with tabs[3]:
             ax.axvline(input_features[3], color='red', linestyle='--', label='Generated Value')
             ax.legend()
             st.pyplot(fig)
-
-with tabs[4]:
-    st.title("Data")
-    st.write(data.head(10))
-
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import joblib
-import os
-import json
-
-app = Flask(__name__)
-CORS(app)
-
-# Load your trained model
-# Replace this with the actual path to your model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'model.pkl')
-model = joblib.load(MODEL_PATH)
-
-@app.route('/api/predict', methods=['POST'])
-def predict():
-    """
-    Endpoint to get predictions from the model
-    """
-    data = request.json
-    try:
-        # Preprocess the input data
-        # Modify this according to your model's requirements
-        input_data = pd.DataFrame(data['inputs'])
-        
-        # Make predictions
-        predictions = model.predict(input_data)
-        
-        return jsonify({
-            'success': True,
-            'predictions': predictions.tolist()
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    """
-    Endpoint to get visualization data
-    """
-    try:
-        # Replace this with your actual data loading logic
-        # Example: loading a CSV file
-        data_path = os.path.join(os.path.dirname(__file__), 'data', 'data.csv')
-        df = pd.read_csv(data_path)
-        
-        # Basic statistics for dashboard
-        stats = {
-            'count': len(df),
-            'features': df.columns.tolist(),
-            'summary': json.loads(df.describe().to_json())
-        }
-        
-        return jsonify({
-            'success': True,
-            'stats': stats,
-            'sample_data': json.loads(df.head(100).to_json(orient='records'))
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-
-if __name__ == '__main__':
-    app.run(debug=True)
